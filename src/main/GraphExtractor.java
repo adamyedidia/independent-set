@@ -17,13 +17,16 @@ public class GraphExtractor {
 	private HashMap<Integer, Boolean> graph;
 	private HashSet<Integer> nodesInGraph;
 
-	@SuppressWarnings("unchecked")
+	private HashMap<Integer, Node> IDsToNodes;
+	
+	private int vertexCount;
+	
 	public GraphExtractor(String path) throws IOException {
 		
 		reader = new BufferedReader(new FileReader(path));
 		String line = null;
 		
-		HashMap<Integer, Node> IDsToNodes = new HashMap<Integer, Node>();
+		IDsToNodes = new HashMap<Integer, Node>();
 		graph = new HashMap<Integer, Boolean>();
 		// The guy above's just gonna be true's all the way down; it's for the 
 		// bonus function to change the values around
@@ -36,7 +39,7 @@ public class GraphExtractor {
 		HashMap<Integer, HashSet<Integer>> nodeToNeighbors = 
 				new HashMap<Integer, HashSet<Integer>>();
 		
-		int vertexCount = 0;
+		vertexCount = 0;
 		
 		while ((line = reader.readLine()) != null) {
 			
@@ -64,7 +67,18 @@ public class GraphExtractor {
 			nodesInGraph.add(i);
 		}
 		
-				
+		List<Integer> finalIncludedList = findIndependentSetTruncation(); // TODO
+		
+		System.out.println("INCLUDED " + finalIncludedList.size() + " NODES:");
+		for (int i=0; i<finalIncludedList.size(); i++) {
+			System.out.println(finalIncludedList.get(i));
+		} 
+		
+//		System.out.println(countTriangles());
+	}
+	
+	@SuppressWarnings("unchecked")
+	private List<Integer> findIndependentSetTruncation() {
 		int depth = 3;
 		
 		boolean depthTooSmall = false;
@@ -72,36 +86,42 @@ public class GraphExtractor {
 		List<Integer> listOfIncludedNodeIDs = new ArrayList<Integer>();
 		
 		// These below are going to be used to check convergence
-		HashMap<Integer, Integer> idsToBonuses;
-		HashMap<Integer, Integer> oldIDsToBonuses;
+		HashMap<Integer, Double> idsToBonuses;
+		HashMap<Integer, Double> oldIDsToBonuses;
 		
 		// This is used to cut the converging off if it's taking forever
 		int iterationsSoFar;
-		int MAX_ITERATIONS = 5;
+		int MAX_ITERATIONS = 10;
 		
 		String MODE = "RANDOM_CHOOSE";
 		
 		while (!nodesInGraph.isEmpty()) {
 			System.out.println("NEXT RUN-THROUGH");
 			
-			idsToBonuses = new HashMap<Integer, Integer>();
-			oldIDsToBonuses = new HashMap<Integer, Integer>();
-			oldIDsToBonuses.put(0, 0);
+			idsToBonuses = new HashMap<Integer, Double>();
+			oldIDsToBonuses = new HashMap<Integer, Double>();
+			oldIDsToBonuses.put(0, 0.0);
 			
 			iterationsSoFar = 0;
 			
 			while (!idsToBonuses.equals(oldIDsToBonuses) && (iterationsSoFar < MAX_ITERATIONS)) {
+				/*
+				for (int i=0; i<vertexCount; i++) {
+					IDsToNodes.get(i).resetBonus();
+				} */
+				
 				iterationsSoFar++;
-				oldIDsToBonuses = (HashMap<Integer, Integer>) idsToBonuses.clone();
+				oldIDsToBonuses = (HashMap<Integer, Double>) idsToBonuses.clone();
 				
 				// Iterate over every node and find its approximate bonus.
+
 				for (int i=0; i<vertexCount; i++) {
 					if (graph.get(i)) {
-				
+
 						Node nodeBeingComputed = IDsToNodes.get(i);
 						
 						// Third argument: DEPTH
-						int bonusEstimate = 0;
+						double bonusEstimate;
 						
 						bonusEstimate = nodeBeingComputed.approximateBonus(IDsToNodes, graph, depth);
 					
@@ -158,7 +178,52 @@ public class GraphExtractor {
 							
 							if (IDsToNodes.get(nextNodeID).neighbors.contains(nextNodeID2)) {
 								
-								if (MODE.equals("INCREASE_DEPTH")) {
+								
+								// Find the independent set of the graph of the conflict nodes,
+								// and include that.
+								if (MODE.equals("RECURSE")) {
+									
+									System.out.println("COLLISION: " + nextNodeID + " " + nextNodeID2);
+									
+									HashMap<Integer, Boolean> conflictGraph = 
+											new HashMap<Integer, Boolean>();
+									HashSet<Integer> conflictNodesInGraph = 
+											new HashSet<Integer>();
+									
+									for (int i=0; i<vertexCount; i++) {
+										if (nodesThatAreOn.contains(i)) {
+											conflictGraph.put(i, true);
+											conflictNodesInGraph.add(i);
+										}
+										else {
+											conflictGraph.put(i, false);
+										}
+									}
+									
+									HashMap<Integer, Boolean> oldGraph = 
+											(HashMap<Integer, Boolean>) graph.clone();
+									HashSet<Integer> oldNodesInGraph =
+											(HashSet<Integer>) nodesInGraph.clone();
+									
+									graph = conflictGraph;
+									nodesInGraph = conflictNodesInGraph;
+									
+									// Recursion step
+									List<Integer> listOfNodesToBeIncluded = findIndependentSetTruncation();
+									
+									graph = oldGraph;
+									nodesInGraph = oldNodesInGraph;
+									
+									for (int i=0; i<listOfNodesToBeIncluded.size(); i++) {
+										include(listOfNodesToBeIncluded.get(i), IDsToNodes, 
+												listOfIncludedNodeIDs);
+									}
+									
+									depthTooSmall = true;
+									break;
+								}
+								
+								else if (MODE.equals("INCREASE_DEPTH")) {
 								
 									depth += 1;
 									System.out.println("COLLISION: " + nextNodeID + " " + nextNodeID2);
@@ -175,6 +240,10 @@ public class GraphExtractor {
 									
 									break;
 								}
+								
+								else if (MODE.equals("SHOW_COLLISIONS")) {
+									System.out.println("COLLISION: " + nextNodeID + " " + nextNodeID2);
+								}
 							}
 						}
 						
@@ -183,26 +252,82 @@ public class GraphExtractor {
 						}
 					}
 					
+					
 					nodesThatAreOnIterator = nodesThatAreOn.iterator();
 					
 					while ((nodesThatAreOnIterator.hasNext()) && (!depthTooSmall)) {
 						int nextNodeID = nodesThatAreOnIterator.next();
 						
 						include(nextNodeID, IDsToNodes, listOfIncludedNodeIDs);
+					} 
+					
+//					include(randomChoose(nodesThatAreOn), IDsToNodes, listOfIncludedNodeIDs);
+				}
+			}
+		}
+		
+		return listOfIncludedNodeIDs;
+	}
+	
+	public int countTriangles() {
+		int triangleCount = 0;
+		
+		for (int a=0; a<vertexCount; a++) {
+			for (int b=a+1; b<vertexCount; b++) {
+				for (int c=b+1; c<vertexCount; c++) {
+					if (IDsToNodes.get(a).neighbors.contains(b) &&
+							IDsToNodes.get(b).neighbors.contains(c) && 
+							IDsToNodes.get(c).neighbors.contains(a)) {
+						
+						System.out.println("" + a + ", " + b + ", " + c);
+						
+						triangleCount++;
 					}
 				}
 			}
 		}
 		
-		System.out.println("INCLUDED " + listOfIncludedNodeIDs.size() + " NODES:");
-		for (int i=0; i<listOfIncludedNodeIDs.size(); i++) {
-			System.out.println(listOfIncludedNodeIDs.get(i));
-		}
+		return triangleCount;
 	}
 	
-/*	private ArrayList<Integer> findIndependentSetTruncation() {
+	private List<Integer> findIndependentSetGreedy() {
+		List<Integer> listOfIncludedNodeIDs = new ArrayList<Integer>();
 		
-	}*/
+		while (!nodesInGraph.isEmpty()) {
+			include(randomChoose(nodesInGraph), IDsToNodes, 
+					listOfIncludedNodeIDs);
+		}
+		
+		return listOfIncludedNodeIDs;
+	}
+	
+	private List<Integer> findIndependentSetGreedyWithDegrees() {
+		List<Integer> listOfIncludedNodeIDs = new ArrayList<Integer>();
+		
+		int bestDegree;
+		int bestNode;
+		
+		int degree;
+		
+		while (!nodesInGraph.isEmpty()) {
+			bestDegree = vertexCount;
+			bestNode = 0;
+			
+			// Find the vertex with the lowest degree; doing an argmax by hand
+			for (int i=0; i<vertexCount; i++) {
+				if (graph.get(i)) {
+					degree = IDsToNodes.get(i).countLiveNeighbors(graph);
+					if (degree < bestDegree) {
+						bestNode = i;
+					}
+				}
+			}
+			
+			include(bestNode, IDsToNodes, listOfIncludedNodeIDs);
+		}
+		
+		return listOfIncludedNodeIDs;
+	}
 	
 	private void delete(int IDofNodeToBeDeleted) {
 		graph.put(IDofNodeToBeDeleted, false);
@@ -237,7 +362,9 @@ public class GraphExtractor {
 	
     public static void main(String[] args) {
     	try {
-			new GraphExtractor("/Users/adam/Documents/workspace/independent_set/frb30-15-2.mis");
+    		// TODO
+			new GraphExtractor("/Users/adam/Documents/workspace/independent_set/frb30-15-1.mis");
+//    		new GraphExtractor("/Users/adam/Documents/workspace/independent_set/mygraph.txt");
 		} catch (IOException e) {
 			e.printStackTrace();
 		}

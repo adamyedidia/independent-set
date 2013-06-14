@@ -6,7 +6,8 @@ public class Node {
 	public Set<Integer> neighbors;
 	public int id;
 	
-	public int bonusEstimate = 0;
+	public double bonusEstimate = 0.0;
+	public double oldBonusEstimate = 0.0;
 	
 	public Node(HashSet<Integer> neighbors, int id) {
 		this.neighbors = neighbors;
@@ -36,7 +37,7 @@ public class Node {
 		return Math.max(0, returnValue);
 	}
 	
-	public int approximateBonus(HashMap<Integer, Node> IDsToNodes, HashMap<Integer, Boolean> graph,
+	public double approximateBonus(HashMap<Integer, Node> IDsToNodes, HashMap<Integer, Boolean> graph,
 			int depth) {
 		
 		if (depth == 0) {
@@ -48,7 +49,7 @@ public class Node {
 			HashMap<Integer, Boolean> graphCopy = (HashMap<Integer, Boolean>) graph.clone();
 			graphCopy.put(id, false);
 			
-			int returnValue = 1;
+			double returnValue = 1.0;
 			Iterator<Integer> neighborIterator = neighbors.iterator();
 			while (neighborIterator.hasNext()) {
 								
@@ -64,7 +65,7 @@ public class Node {
 						}
 					} */
 					
-					int bonusValue = IDsToNodes.get(nextNeighborID).approximateBonus(IDsToNodes, 
+					double bonusValue = IDsToNodes.get(nextNeighborID).approximateBonus(IDsToNodes, 
 							graphCopy, depth - 1);
 					
 /*					if ((graphCopy.get(0)) && 
@@ -88,8 +89,26 @@ public class Node {
 				graphCopy.put(nextNeighborID, false);
 			}
 			
-			return Math.max(0, returnValue);
+			return Math.max(0.0, returnValue);
 		}
+	}
+	
+	public void resetBonus() {
+		oldBonusEstimate = bonusEstimate;
+	}
+	
+	public int countLiveNeighbors(HashMap<Integer, Boolean> graph) {
+		int neighborCount = 0;
+		
+		Iterator<Integer> graphIterator = graph.keySet().iterator();
+		while (graphIterator.hasNext()) {
+			int nextNeighbor = graphIterator.next();
+			if (graph.get(nextNeighbor)) {
+				neighborCount++;
+			}
+		}
+		
+		return neighborCount;
 	}
 	
     public static void main(String[] args) {
