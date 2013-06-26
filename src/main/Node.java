@@ -6,8 +6,11 @@ public class Node {
 	public Set<Integer> neighbors;
 	public int id;
 	
-	public double bonusEstimate = 0.0;
-	public double oldBonusEstimate = 0.0;
+	public double INITIALIZATION_VALUE = 0.12; // TODO
+	public int NUMBER_OF_NODES_IN_START_GRAPH = 50;
+	
+	public double bonusEstimate = INITIALIZATION_VALUE;
+	public double oldBonusEstimate = INITIALIZATION_VALUE;
 	
 	public Node(HashSet<Integer> neighbors, int id) {
 		this.neighbors = neighbors;
@@ -41,7 +44,8 @@ public class Node {
 			int depth) {
 		
 		if (depth == 0) {
-			return bonusEstimate;
+			return oldBonusEstimate;			
+//			return bonusEstimate;
 		}
 		
 		else {
@@ -57,32 +61,9 @@ public class Node {
 				
 				if (graphCopy.get(nextNeighborID)) {
 					
-/*					if ((!graph.containsValue(false)) && (id == 9) && (nextNeighborID == 3)) {
-						Iterator<Integer> iter = graphCopy.keySet().iterator();
-						while (iter.hasNext()) {
-							int ID = iter.next();
-							System.out.println("" + ID + " " + graphCopy.get(ID));
-						}
-					} */
-					
 					double bonusValue = IDsToNodes.get(nextNeighborID).approximateBonus(IDsToNodes, 
 							graphCopy, depth - 1);
-					
-/*					if ((graphCopy.get(0)) && 
-							(!graphCopy.get(1)) &&
-							(graphCopy.get(2)) && 
-							(!graphCopy.get(3)) && 
-							(!graphCopy.get(4)) && 
-							(!graphCopy.get(5)) && 
-							(graphCopy.get(6)) && 
-							(graphCopy.get(7)) && 
-							(graphCopy.get(8)) && 
-							(!graphCopy.get(9)) && 
-							(id == 4) &&
-							(nextNeighborID == 7)) {
-						System.out.println("" + bonusValue + " " + depth);
-					} */
-					
+			
 					returnValue -= bonusValue;
 					
 				}	
@@ -95,6 +76,25 @@ public class Node {
 	
 	public void resetBonus() {
 		oldBonusEstimate = bonusEstimate;
+	}
+	
+	public void reinitializeBonus(HashSet<Integer> nodesInGraph) {
+		bonusEstimate = INITIALIZATION_VALUE * NUMBER_OF_NODES_IN_START_GRAPH / nodesInGraph.size();
+	}
+	
+	public void setBonusTo(double value) {
+		bonusEstimate = value;
+		oldBonusEstimate = value;
+	}
+	
+	public void setBonusLikeAdamWould(HashMap<Integer, Node> IDsToNodes) {
+		double multCounter = 1;
+		
+		for (int nodeID : neighbors) {
+			multCounter *= 1 - IDsToNodes.get(nodeID).oldBonusEstimate;
+		}
+		
+		bonusEstimate = multCounter;
 	}
 	
 	public int countLiveNeighbors(HashMap<Integer, Boolean> graph) {

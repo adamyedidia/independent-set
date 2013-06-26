@@ -65,9 +65,10 @@ public class GraphExtractor {
 		for (int i=0; i<vertexCount; i++) {
 			IDsToNodes.put(i, new Node(nodeToNeighbors.get(i), i)); // Create all the nodes
 			nodesInGraph.add(i);
+			
 		}
 		
-		List<Integer> finalIncludedList = findIndependentSetTruncation(); // TODO
+		List<Integer> finalIncludedList = machineLearningFuzzy(); // TODO
 		
 		System.out.println("INCLUDED " + finalIncludedList.size() + " NODES:");
 		for (int i=0; i<finalIncludedList.size(); i++) {
@@ -79,7 +80,7 @@ public class GraphExtractor {
 	
 	@SuppressWarnings("unchecked")
 	private List<Integer> findIndependentSetTruncation() {
-		int depth = 3;
+		int depth = 5; // TODO
 		
 		boolean depthTooSmall = false;
 		
@@ -91,7 +92,7 @@ public class GraphExtractor {
 		
 		// This is used to cut the converging off if it's taking forever
 		int iterationsSoFar;
-		int MAX_ITERATIONS = 10;
+		int MAX_ITERATIONS = 1; // TODO
 		
 		String MODE = "RANDOM_CHOOSE";
 		
@@ -105,10 +106,10 @@ public class GraphExtractor {
 			iterationsSoFar = 0;
 			
 			while (!idsToBonuses.equals(oldIDsToBonuses) && (iterationsSoFar < MAX_ITERATIONS)) {
-				/*
+				
 				for (int i=0; i<vertexCount; i++) {
 					IDsToNodes.get(i).resetBonus();
-				} */
+				} 
 				
 				iterationsSoFar++;
 				oldIDsToBonuses = (HashMap<Integer, Double>) idsToBonuses.clone();
@@ -141,11 +142,13 @@ public class GraphExtractor {
 			// it. Throw its neighbors into the ocean, as an offering to the Drowned God.
 			for (int i=0; i<vertexCount; i++) {
 				if (graph.get(i)) {
-					if (IDsToNodes.get(i).bonusEstimate == 1) {
+					if (IDsToNodes.get(i).bonusEstimate == 1.0) {
 						nodesThatAreOn.add(i);
 					}
 				}
 			}
+			
+			reinitializeAllNodes(nodesInGraph);
 			
 			if (!nodesInGraph.isEmpty()) {
 			
@@ -153,6 +156,7 @@ public class GraphExtractor {
 				// at random, and repeat.
 				if (nodesThatAreOn.isEmpty()) {
 					delete(randomChoose(nodesInGraph));
+//					include(findIDofNodeWithHighestBonus(), IDsToNodes, listOfIncludedNodeIDs);
 				}
 				
 				// In this case, we have to check that the included nodes make sense. 
@@ -167,7 +171,7 @@ public class GraphExtractor {
 					Iterator<Integer> nodesThatAreOnIterator = nodesThatAreOn.iterator();
 					
 					// Check every pair of nodes for adjacency.
-					// TODO factor of 2 optimization possible
+					// factor of 2 optimization still possible
 					while (nodesThatAreOnIterator.hasNext()) {
 						int nextNodeID = nodesThatAreOnIterator.next();
 						
@@ -223,6 +227,46 @@ public class GraphExtractor {
 									break;
 								}
 								
+								else if (MODE.equals("RECURSE_WITH_RANDOM_CHOICE")) {
+									System.out.println("COLLISION: " + nextNodeID + " " + nextNodeID2);
+									
+									HashMap<Integer, Boolean> conflictGraph = 
+											new HashMap<Integer, Boolean>();
+									HashSet<Integer> conflictNodesInGraph = 
+											new HashSet<Integer>();
+									
+									for (int i=0; i<vertexCount; i++) {
+										if (nodesThatAreOn.contains(i)) {
+											conflictGraph.put(i, true);
+											conflictNodesInGraph.add(i);
+										}
+										else {
+											conflictGraph.put(i, false);
+										}
+									}
+									
+									HashMap<Integer, Boolean> oldGraph = 
+											(HashMap<Integer, Boolean>) graph.clone();
+									HashSet<Integer> oldNodesInGraph =
+											(HashSet<Integer>) nodesInGraph.clone();
+									
+									graph = conflictGraph;
+									nodesInGraph = conflictNodesInGraph;
+									
+									// Recursion step
+									List<Integer> listOfCandidateNodesToBeIncluded = 
+											findIndependentSetTruncation();
+									
+									graph = oldGraph;
+									nodesInGraph = oldNodesInGraph;
+									
+									include(randomChoose(listOfCandidateNodesToBeIncluded), IDsToNodes, 
+											listOfIncludedNodeIDs);
+									
+									depthTooSmall = true;
+									break;
+								}
+								
 								else if (MODE.equals("INCREASE_DEPTH")) {
 								
 									depth += 1;
@@ -234,8 +278,10 @@ public class GraphExtractor {
 								}
 								else if (MODE.equals("RANDOM_CHOOSE")) {
 									
+									System.out.println("COLLISION: " + nextNodeID + " " + nextNodeID2);
+									
 									depthTooSmall = true;
-									include(randomChoose(nodesInGraph), IDsToNodes, 
+									include(randomChoose(nodesThatAreOn), IDsToNodes, 
 											listOfIncludedNodeIDs);
 									
 									break;
@@ -252,21 +298,98 @@ public class GraphExtractor {
 						}
 					}
 					
+					if (!depthTooSmall) {
 					
-					nodesThatAreOnIterator = nodesThatAreOn.iterator();
+						nodesThatAreOnIterator = nodesThatAreOn.iterator();
 					
-					while ((nodesThatAreOnIterator.hasNext()) && (!depthTooSmall)) {
-						int nextNodeID = nodesThatAreOnIterator.next();
-						
-						include(nextNodeID, IDsToNodes, listOfIncludedNodeIDs);
-					} 
+						while ((nodesThatAreOnIterator.hasNext()) && (!depthTooSmall)) {
+							int nextNodeID = nodesThatAreOnIterator.next();
+							
+							include(nextNodeID, IDsToNodes, listOfIncludedNodeIDs);
+						} 
 					
-//					include(randomChoose(nodesThatAreOn), IDsToNodes, listOfIncludedNodeIDs);
+//						include(randomChoose(nodesThatAreOn), IDsToNodes, listOfIncludedNodeIDs);
+					}
 				}
 			}
 		}
 		
 		return listOfIncludedNodeIDs;
+	}
+	
+	public List<Integer> adamsExperiment() {
+		int ITERATION_NUM = 100;
+		
+		List<Integer> listOfIncludedNodeIDs = new ArrayList<Integer>();
+		
+		while (!nodesInGraph.isEmpty()) {
+			setAllNodesBonusTo(1.0 / 450.0);
+			for (int i=0; i<ITERATION_NUM; i++) {
+				updateAllNodesBonusAsAdamWould();
+				resetAllBonuses();
+				
+				double bonusSum = sumOfBonuses();
+				scaleAllBonusesBy(1.0 / bonusSum);
+			}
+			
+			for (int nodeID : nodesInGraph) {
+				System.out.println(IDsToNodes.get(nodeID).bonusEstimate);
+			}
+			
+			int IDofNodeWithHighestBonus = findIDofNodeWithHighestBonus();
+			include(IDofNodeWithHighestBonus, IDsToNodes, listOfIncludedNodeIDs);
+		}
+		
+		return listOfIncludedNodeIDs;
+	}
+	
+	public double sumOfBonuses() {
+		double counter = 0.0;
+		
+		for (int nodeID : nodesInGraph) {
+			counter += IDsToNodes.get(nodeID).bonusEstimate;
+		}
+		
+		return counter;
+	}
+	
+	public int findIDofNodeWithHighestBonus() {
+		double highestBonus = -100000;
+		int IDofNodeWithHighestBonus = -1;
+		
+		for (int nodeID : nodesInGraph) {
+			if (IDsToNodes.get(nodeID).bonusEstimate > IDofNodeWithHighestBonus) {
+				IDofNodeWithHighestBonus = nodeID;
+				highestBonus = IDsToNodes.get(nodeID).bonusEstimate;
+			}
+		}
+		
+		return IDofNodeWithHighestBonus;
+	}
+	
+	public void scaleAllBonusesBy(double value) {
+		for (int nodeID : nodesInGraph) {
+			IDsToNodes.get(nodeID).bonusEstimate *= value;
+			IDsToNodes.get(nodeID).oldBonusEstimate *= value;
+		}
+	}
+	
+	public void updateAllNodesBonusAsAdamWould() {
+		for (int nodeID : nodesInGraph) {
+			IDsToNodes.get(nodeID).setBonusLikeAdamWould(IDsToNodes);
+		}
+	}
+	
+	public void setAllNodesBonusTo(double value) {
+		for (int nodeID : nodesInGraph) {
+			IDsToNodes.get(nodeID).setBonusTo(value);
+		}
+	}
+	
+	public void resetAllBonuses() {
+		for (int nodeID : nodesInGraph) {
+			IDsToNodes.get(nodeID).resetBonus();
+		}
 	}
 	
 	public int countTriangles() {
@@ -288,6 +411,224 @@ public class GraphExtractor {
 		}
 		
 		return triangleCount;
+	}
+	
+	@SuppressWarnings("unchecked")
+	private List<Integer> machineLearningFuzzy() {
+		double LAXNESS = 1;
+		Random rand = new Random();
+		
+		HashSet<Integer> masterCopy = (HashSet<Integer>) nodesInGraph.clone();
+		HashSet<Integer> nodesInGraphClone = (HashSet<Integer>) nodesInGraph.clone();
+		
+		HashMap<Integer, Double> nodeIDtoTotalIndSetSize = new HashMap<Integer, Double>();
+		HashMap<Integer, Integer> nodeIDtoNumIndSets = new HashMap<Integer, Integer>();
+		HashMap<Integer, Double> nodeIDtoAvgIndSetSize = new HashMap<Integer, Double>();
+		
+		// Initialize the hashmaps
+		for (int i : masterCopy) {
+			nodeIDtoTotalIndSetSize.put(i, 0.0);
+			nodeIDtoNumIndSets.put(i, 0);
+			nodeIDtoAvgIndSetSize.put(i, 0.0);
+		}
+		
+		List<Integer> masterList = new ArrayList<Integer>();
+		
+		double maxAvgIndSetSize = 0;
+		
+		int candidateNode;
+		double candidateAvg;
+		double diff;
+		double rerollProb = 0;
+		
+		double currentTotal;
+		int currentNum;
+		
+		double avgIndSetSize;
+		
+		for (int i=0; i<1000; i++) {
+			
+			for (int j=0; j<1000; j++) {
+				List<Integer> listOfIncludedNodeIDs = new ArrayList<Integer>();
+				nodesInGraphClone = (HashSet<Integer>) masterCopy.clone();
+				
+				if (maxAvgIndSetSize == 0) {
+										
+					while (!nodesInGraphClone.isEmpty()) {
+						includeWhereYouSpecifyTheGraph(randomChoose(nodesInGraphClone), nodesInGraphClone, 
+								graph, listOfIncludedNodeIDs, false);
+					}
+				}
+				
+				else {
+										
+					while (!nodesInGraphClone.isEmpty()) {
+						// Do the weighted inclusion
+						while (true) {
+							candidateNode = randomChoose(nodesInGraphClone);
+							candidateAvg = nodeIDtoAvgIndSetSize.get(candidateNode);
+							diff = candidateAvg - maxAvgIndSetSize;
+						
+							if (diff == 0) 
+								rerollProb = 0;
+							
+							else 
+								rerollProb = Math.exp(LAXNESS*candidateAvg/diff);
+							
+							// This is flipped; this is because we enter this if statement when we
+							// DON'T reroll.
+//							System.out.println("reroll " + rerollProb + " " + candidateAvg + " " + 
+	//						maxAvgIndSetSize);
+							
+							if (rand.nextDouble() > rerollProb) {
+								break;
+							}
+						}
+						
+						includeWhereYouSpecifyTheGraph(candidateNode, nodesInGraphClone, 
+								graph, listOfIncludedNodeIDs, false);
+					}
+				}
+				
+				for (int k : listOfIncludedNodeIDs) {
+					currentTotal = nodeIDtoTotalIndSetSize.get(k);
+					
+					nodeIDtoTotalIndSetSize.put(k, currentTotal + listOfIncludedNodeIDs.size());
+					currentNum = nodeIDtoNumIndSets.get(k);
+										
+					nodeIDtoNumIndSets.put(k, currentNum + 1);
+				}
+			}
+			
+			maxAvgIndSetSize = 0;
+			
+			for (int j : masterCopy) {
+				System.out.println("" + j + " " + nodeIDtoTotalIndSetSize.get(j) + nodeIDtoNumIndSets.get(j));
+				System.out.println("" + j + " " + nodeIDtoTotalIndSetSize.get(j) / nodeIDtoNumIndSets.get(j));
+				System.out.println("");
+				
+				avgIndSetSize = nodeIDtoTotalIndSetSize.get(j) / nodeIDtoNumIndSets.get(j);
+				
+				nodeIDtoAvgIndSetSize.put(j, avgIndSetSize);
+				
+				if (avgIndSetSize > maxAvgIndSetSize) {
+					maxAvgIndSetSize = avgIndSetSize;
+				}
+			}
+		}
+		
+		while (!masterCopy.isEmpty()) {
+		
+			double bestAvg = 0;
+			
+			double avg;
+			int bestNodeID = -1;
+					
+			for (int j : masterCopy) {
+				avg = nodeIDtoAvgIndSetSize.get(j);
+				System.out.println("" + j + " " + avg);
+				
+				if (nodeIDtoAvgIndSetSize.get(j) > bestAvg) {
+					bestAvg = avg;
+					bestNodeID = j;
+				}
+			}
+			
+			includeWhereYouSpecifyTheGraph(bestNodeID, masterCopy, graph, masterList, true);
+		
+		}
+		
+		return masterList;
+	}
+	
+	@SuppressWarnings("unchecked")
+	private List<Integer> machineLearningGreedy() {
+		HashSet<Integer> masterCopy = (HashSet<Integer>) nodesInGraph.clone();
+		HashSet<Integer> nodesInGraphClone = (HashSet<Integer>) nodesInGraph.clone();
+		
+		HashMap<Integer, Double> nodeIDtoTotalIndSetSize = new HashMap<Integer, Double>();
+		HashMap<Integer, Integer> nodeIDtoNumIndSets = new HashMap<Integer, Integer>();
+		HashMap<Integer, Double> nodeIDtoAvgIndSetSize = new HashMap<Integer, Double>();
+		
+		List<Integer> masterList = new ArrayList<Integer>();
+		
+		while (!masterCopy.isEmpty()) {
+			
+			for (int i : masterCopy) {
+				nodeIDtoTotalIndSetSize.put(i, 0.0);
+				nodeIDtoNumIndSets.put(i, 0);
+				nodeIDtoAvgIndSetSize.put(i, 0.0);
+			}
+			
+			for (int i=0; i<10000; i++) {
+				
+				List<Integer> listOfIncludedNodeIDs = new ArrayList<Integer>();
+				
+				nodesInGraphClone = (HashSet<Integer>) masterCopy.clone();
+				
+				while (!nodesInGraphClone.isEmpty()) {
+					includeWhereYouSpecifyTheGraph(randomChoose(nodesInGraphClone), nodesInGraphClone, 
+							graph, listOfIncludedNodeIDs, false);
+				}
+								
+				for (int j : listOfIncludedNodeIDs) {
+					double currentTotal = nodeIDtoTotalIndSetSize.get(j);
+					
+					nodeIDtoTotalIndSetSize.put(j, currentTotal + listOfIncludedNodeIDs.size());
+					int currentNum = nodeIDtoNumIndSets.get(j);
+										
+					nodeIDtoNumIndSets.put(j, currentNum + 1);
+				}
+			}
+			
+			for (int j : masterCopy) {
+				System.out.println("" + j + " " + nodeIDtoTotalIndSetSize.get(j) + nodeIDtoNumIndSets.get(j));
+				System.out.println("" + j + " " + nodeIDtoTotalIndSetSize.get(j) / nodeIDtoNumIndSets.get(j));
+				System.out.println("");
+				
+				nodeIDtoAvgIndSetSize.put(j, 
+						nodeIDtoTotalIndSetSize.get(j) / nodeIDtoNumIndSets.get(j));
+			}
+			
+			double bestAvg = 0;
+			
+			double avg;
+			int bestNodeID = -1;
+					
+			for (int j : masterCopy) {
+				avg = nodeIDtoAvgIndSetSize.get(j);
+				System.out.println("" + j + " " + avg);
+				
+				if (nodeIDtoAvgIndSetSize.get(j) > bestAvg) {
+					bestAvg = avg;
+					bestNodeID = j;
+				}
+			}
+			
+			includeWhereYouSpecifyTheGraph(bestNodeID, masterCopy, graph, masterList, true);
+		}	
+		
+		return masterList;
+	}
+	
+	@SuppressWarnings("unchecked")
+	private List<Integer> repeatRandomGreedy() {
+		List<Integer> bestIndSetSoFar = null;
+		int bestIncludeCountSoFar = 0;
+		
+		HashSet<Integer> nodesInGraphClone = (HashSet<Integer>) nodesInGraph.clone();
+		
+		for (int i=0; i<10000; i++) {
+			nodesInGraph = (HashSet<Integer>) nodesInGraphClone.clone();
+			
+			List<Integer> candidateList = findIndependentSetGreedy();
+			if (candidateList.size() > bestIncludeCountSoFar) {
+				bestIncludeCountSoFar = candidateList.size();
+				bestIndSetSoFar = candidateList;
+			}
+		}
+		
+		return bestIndSetSoFar;
 	}
 	
 	private List<Integer> findIndependentSetGreedy() {
@@ -353,6 +694,35 @@ public class GraphExtractor {
 		listOfIncludedNodeIDs.add(IDofNodeToBeIncluded);
 	}
 		
+	private void includeWhereYouSpecifyTheGraph(int IDofNodeToBeIncluded, 
+			HashSet<Integer> nodesInGraph, HashMap<Integer, Boolean> graph,
+			List<Integer> listOfIncludedNodeIDs, Boolean verbose) {
+		// delete neighbors
+		Iterator<Integer> neighborsIterator = 
+				IDsToNodes.get(IDofNodeToBeIncluded).neighbors.iterator();
+		
+		while (neighborsIterator.hasNext()) {
+			int nextNeighborID = neighborsIterator.next();
+			
+			deleteWhereYouSpecifyTheGraph(nextNeighborID, nodesInGraph, graph);
+		}
+		
+		// delete the node itself
+		deleteWhereYouSpecifyTheGraph(IDofNodeToBeIncluded, nodesInGraph, graph);
+		
+		if (verbose)
+			System.out.println("Included " + IDofNodeToBeIncluded);
+		
+		listOfIncludedNodeIDs.add(IDofNodeToBeIncluded);
+		
+	}
+		
+	private void deleteWhereYouSpecifyTheGraph(int IDofNodeToBeDeleted,
+			HashSet<Integer> nodesInGraph, HashMap<Integer, Boolean> graph) {
+		graph.put(IDofNodeToBeDeleted, false);
+		nodesInGraph.remove(IDofNodeToBeDeleted);
+	}
+	
 	public <E> E randomChoose(HashSet<E> set) {
 		@SuppressWarnings("unchecked")
 		E[] choiceArray = (E[]) set.toArray();
@@ -360,11 +730,24 @@ public class GraphExtractor {
 		return choiceArray[rand.nextInt(choiceArray.length)];
 	}
 	
+	public <E> E randomChoose(List<E> list) {
+		@SuppressWarnings("unchecked")
+		E[] choiceArray = (E[]) list.toArray();
+		Random rand = new Random();
+		return choiceArray[rand.nextInt(choiceArray.length)];
+	}
+	
+	private void reinitializeAllNodes(HashSet<Integer> nodesInGraph) {
+		for (int i=0; i<vertexCount; i++) {
+			IDsToNodes.get(i).reinitializeBonus(nodesInGraph);
+		}
+	}
+	
     public static void main(String[] args) {
     	try {
     		// TODO
 			new GraphExtractor("/Users/adam/Documents/workspace/independent_set/frb30-15-1.mis");
-//    		new GraphExtractor("/Users/adam/Documents/workspace/independent_set/mygraph.txt");
+    //		new GraphExtractor("/Users/adam/Documents/workspace/independent_set/mygraph.txt");
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
