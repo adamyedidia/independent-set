@@ -560,7 +560,7 @@ public class GraphExtractor {
 				nodeIDtoAvgIndSetSize.put(i, 0.0);
 			}
 			
-			for (int i=0; i<10000; i++) {
+			for (int i=0; i<100000; i++) {
 				
 				List<Integer> listOfIncludedNodeIDs = new ArrayList<Integer>();
 				
@@ -746,7 +746,8 @@ public class GraphExtractor {
     public static void main(String[] args) {
     	try {
     		// TODO
-			new GraphExtractor("/Users/adam/Documents/workspace/independent_set/frb30-15-1.mis");
+    		new GraphExtractor("/Users/adam/Documents/workspace/independent_set/frb35-17-1.clq");
+	//		new GraphExtractor("/Users/adam/Documents/workspace/independent_set/frb30-15-1.mis");
     //		new GraphExtractor("/Users/adam/Documents/workspace/independent_set/mygraph.txt");
 		} catch (IOException e) {
 			e.printStackTrace();
