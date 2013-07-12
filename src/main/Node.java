@@ -12,23 +12,33 @@ public class Node {
 	public double bonusEstimate = INITIALIZATION_VALUE;
 	public double oldBonusEstimate = INITIALIZATION_VALUE;
 	
+	public double weight = initializeWeight();
+	
 	public Node(HashSet<Integer> neighbors, int id) {
 		this.neighbors = neighbors;
 		this.id = id;
 	}
 	
-	public int bonus(HashMap<Integer, Node> IDsToNodes, HashMap<Integer, Boolean> graph) { 
+	private double initializeWeight() {
+		// TODO 
+//		return 0.01;
+		
+		Random rand = new Random();
+		return -Math.log(rand.nextDouble());
+	}
 
+	public double bonus(HashMap<Integer, Node> IDsToNodes, HashMap<Integer, Boolean> graph) { 
+		
 		@SuppressWarnings("unchecked")
 		HashMap<Integer, Boolean> graphCopy = (HashMap<Integer, Boolean>) graph.clone();
 		graphCopy.put(id, false);
 		
-			int returnValue = 1;
+			double returnValue = weight;
 			Iterator<Integer> neighborIterator = neighbors.iterator();
 			while (neighborIterator.hasNext()) {
 				int nextNeighborID = neighborIterator.next();
 				if (graphCopy.get(nextNeighborID)) {
-					int bonusValue = IDsToNodes.get(nextNeighborID).bonus(IDsToNodes, 
+					double bonusValue = IDsToNodes.get(nextNeighborID).bonus(IDsToNodes, 
 							graphCopy);
 					
 					returnValue -= bonusValue;
@@ -43,9 +53,12 @@ public class Node {
 	public double approximateBonus(HashMap<Integer, Node> IDsToNodes, HashMap<Integer, Boolean> graph,
 			int depth) {
 		
-		if (depth == 0) {
+		double EXPAND_PROBABILITY = 0.7; // TODO
+		
+		Random rand = new Random();
+		
+		if ((depth == 0) || (rand.nextDouble() > EXPAND_PROBABILITY)) {
 			return oldBonusEstimate;			
-//			return bonusEstimate;
 		}
 		
 		else {
@@ -53,7 +66,8 @@ public class Node {
 			HashMap<Integer, Boolean> graphCopy = (HashMap<Integer, Boolean>) graph.clone();
 			graphCopy.put(id, false);
 			
-			double returnValue = 1.0;
+			double returnValue = weight;
+			
 			Iterator<Integer> neighborIterator = neighbors.iterator();
 			while (neighborIterator.hasNext()) {
 								
@@ -79,7 +93,14 @@ public class Node {
 	}
 	
 	public void reinitializeBonus(HashSet<Integer> nodesInGraph) {
-		bonusEstimate = INITIALIZATION_VALUE * NUMBER_OF_NODES_IN_START_GRAPH / nodesInGraph.size();
+//		bonusEstimate = INITIALIZATION_VALUE * NUMBER_OF_NODES_IN_START_GRAPH / nodesInGraph.size();
+		bonusEstimate = 0.0;
+		
+		Random rand = new Random(); // TODO
+		
+		if (rand.nextBoolean()) {
+			bonusEstimate = 1.0;
+		}
 	}
 	
 	public void setBonusTo(double value) {
